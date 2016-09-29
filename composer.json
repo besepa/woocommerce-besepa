@@ -1,0 +1,32 @@
+{
+  "name": "besepa/besepa-woocommerce",
+  "description": "Besepa gateway for WooCommerce and WooCommerce Subscriptions",
+  "keywords": ["wordpress", "plugin", "besepa", "woocommerce"],
+  "homepage": "https://besepa.com",
+  "license": "MIT",
+  "authors": [
+    {
+      "name":     "Asier Marqués",
+      "email":    "asier@simettric.com",
+      "homepage": "http://simettric.com"
+    }
+  ],
+  "type": "wordpress-plugin",
+  "repositories": [
+    {
+      "type": "composer",
+      "url": "https://wpackagist.org"
+    }
+  ],
+  "require": {
+    "php": ">=5.4",
+    "besepa/besepa": "dev-master",
+    "globalcitizen/php-iban": "dev-master"
+  },
+  "autoload": {
+    "psr-4": {
+      "Besepa\\WCPlugin\\Test\\": "tests/",
+      "Besepa\\WCPlugin\\": "src/"
+    }
+  }
+}

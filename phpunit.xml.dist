@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<phpunit bootstrap="./vendor/autoload.php">
+
+    <testsuites>
+        <testsuite name="Besepa for WooCommerce test suite">
+            <directory>./tests</directory>
+            <directory>./tests-client</directory>
+        </testsuite>
+    </testsuites>
+
+</phpunit>
