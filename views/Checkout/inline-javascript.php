@@ -1,5 +1,5 @@
 
-var tax_id_field_id = "nif";
+var tax_id_field_id = "besepa_taxid";
 
 var ajax_url = "<?php echo get_permalink() ?>";
 
