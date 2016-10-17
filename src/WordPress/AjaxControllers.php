@@ -139,7 +139,8 @@ class AjaxControllers
                         "error"       => false,
                         "bank_account" => array(
                             'id' => $bank_account->id,
-                            "iban" => $bank_account->iban
+                            "iban" => $bank_account->iban,
+                            "status" => $bank_account->status
                         )
                     );
                 }
