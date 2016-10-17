@@ -121,7 +121,7 @@ class AjaxControllers
             return;
 
         if( isset($_GET["besepa_iban"]) &&
-            isset($_GET["besepa_iban"]))
+            isset($_GET["besepa_customer_id"]))
         {
 
             $bank_account = new BankAccount();
