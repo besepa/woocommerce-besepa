@@ -21,6 +21,6 @@ var besepa_messages  = {
 };
 
 var besepa_user = {
-    customer_id: "<?php echo $userManager->getUser()->getCustomerId()?:'null' ?>",
+    customer_id: "<?php echo $userManager->getUser()->getCustomerId()?:'' ?>",
     user_id: "<?php echo get_current_user_id()?:0 ?>"
 };
