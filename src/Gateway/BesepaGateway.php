@@ -93,31 +93,31 @@ class BesepaGateway extends \WC_Payment_Gateway
      * @param $amount
      * @param \WC_Order $subscription
      */
-    public function onSubscriptionPayment( $amount, \WC_Order $subscription )
+    public function onSubscriptionPayment( $amount, \WC_Order $order )
     {
 
-
         $checkoutData = new CheckoutData();
-        $checkoutData->order  = $subscription;
+        $checkoutData->order  = $order;
         $checkoutData->amount = $amount;
         $checkoutData->selectedBankAccountId = get_post_meta($checkoutData->order->id, "_besepa_bank_account_id", true);
 
 
-        if($this->repository->process($checkoutData, true))
+
+        if($this->repository->process($checkoutData, wcs_get_subscriptions_for_renewal_order($order)))
         {
 
-            $subscription->add_order_note('Pago de suscripción ok');
-            $subscription->update_status('completed');
 
-            \WC_Subscriptions_Manager::process_subscription_payments_on_order( $subscription );
-            $subscription->payment_complete();
+
+            \WC_Subscriptions_Manager::process_subscription_payments_on_order( $order );
+            $order->add_order_note('Pago de suscripción ok');
+            $order->update_status('completed');
+            //\WC_Subscriptions_Manager::activate_subscriptions_for_order( $order );
+
 
         }else{
-
-            $subscription->update_status( 'failed', sprintf( __( 'Besepa Transaction Failed', 'besepa' ) ) );
-            \WC_Subscriptions_Manager::process_subscription_payment_failure_on_order( $subscription );
+            $order->update_status( 'failed', sprintf( __( 'Besepa Transaction Failed', 'besepa' ) ) );
+            \WC_Subscriptions_Manager::process_subscription_payment_failure_on_order( $order );
         }
-
     }
 
     /**
