@@ -86,6 +86,8 @@ class BesepaGateway extends \WC_Payment_Gateway
 
 	    }
 
+	    \add_action('init', array($this, 'listenBesepaWebhook'));
+
     }
 
     /**
@@ -106,11 +108,13 @@ class BesepaGateway extends \WC_Payment_Gateway
         if($this->repository->process($checkoutData, true))
         {
 
-            $subscription->add_order_note('Pago de suscripción ok');
+            $subscription->add_order_note(__("'Pago de suscripción ok'", "besepa"));
             $subscription->update_status('completed');
 
             \WC_Subscriptions_Manager::process_subscription_payments_on_order( $subscription );
+
             $subscription->payment_complete();
+            \WC_Subscriptions_Manager::activate_subscriptions_for_order( $subscription );
 
         }else{
 
@@ -279,6 +283,20 @@ class BesepaGateway extends \WC_Payment_Gateway
 				    'redirect' => $this->get_return_url( $order )
 			    );
 
+		    }else if($checkoutData->bankAccount &&
+		             $checkoutData->bankAccount->status == BankAccount::STATUS_ACTIVE)
+		    {
+
+		    	// Payment processed but not charged because the account is not active
+
+			    $order->update_status('pending', __( 'La cuenta bancaria no está activada, el pedido se ha completado pero queda pendiente de pago', 'besepa' ));
+			    $order->reduce_order_stock();
+			    \WC()->cart->empty_cart();
+
+			    return array(
+				    'result' => 'success',
+				    'redirect' => $this->get_return_url( $order )
+			    );
 		    }
 
 
@@ -286,19 +304,105 @@ class BesepaGateway extends \WC_Payment_Gateway
         {
 		    wc_add_notice( __('Payment error:', 'woothemes') . " ". __("error intentando realizar el cobro en la cuenta indicada", "besepa"), 'error' );
 		    return;
-	    }catch (DebitCreationException $e)
+
+	    }catch (\Besepa\WCPlugin\Exception\DebitCreationException $e)
         {
-            if(isset($e->field_messages->debtor_bank_account))
-            {
-                wc_add_notice( __('Payment error:', 'woothemes') . " ". __("La cuenta bancaria indicada no está activada", "besepa"), 'error' );
-                return;
-            }
-
-
+            wc_add_notice( __('Payment error:', 'woothemes') . " ". __("error intentando realizar el cobro en la cuenta indicada", "besepa"), 'error' );
+            return;
         }
 
 	    wc_add_notice( __('Payment error:', 'woothemes') . " ". __("error intentando realizar el cargo en la cuenta indicada", "besepa"), 'error' );
 	    return;
+
+    }
+
+	/**
+	 * Processes and saves options.
+	 * If there is an error thrown, will continue to save and validate fields, but will leave the erroring field out.
+	 * @return bool was anything saved?
+	 */
+    public function process_admin_options()
+    {
+    	$result = parent::process_admin_options();
+
+	    //register webhook required for besepa bankaccount activations
+	    $this->repository->registerWebhook();
+
+	    return $result;
+    }
+
+    function listenBesepaWebhook()
+    {
+
+    	$result = array('error'=>true);
+
+	    if(isset($_GET[ BesepaWCRepository::WEBHOOK_PARAM ]))
+	    {
+		    $json = file_get_contents('php://input');
+		    $notification = json_decode($json, true);
+
+		    if(isset($notification["event"]))
+		    {
+
+		    	switch ($notification["event"])
+			    {
+			    	case 'mandate.signed';
+
+						$processed_count=0;
+
+					    $bank_account_data = $notification["data"];
+						if(isset($bank_account_data["id"]))
+						{
+							$bank_account = $this->repository->getBankAccount($bank_account_data["id"], $bank_account_data["customer_id"]);
+
+							if($bank_account)
+							{
+								$pending_orders = get_posts( array(
+									'numberposts' => -1,
+									'meta_key'    => 'besepa_bank_account_unsigned',
+									'meta_value'  => 1,
+									'post_type'   => wc_get_order_types(),
+									'post_status' => array_keys( wc_get_order_statuses() ),
+								));
+
+								if(is_array($pending_orders))
+								{
+									foreach($pending_orders as $order_post)
+									{
+										$order = wc_get_order($order_post);
+										if($order->get_status() == "pending")
+										{
+
+											if($this->repository->processPendingOrder($order, $bank_account))
+											{
+												$processed_count++;
+											}
+
+										}
+									}
+								}
+								$result = array(
+									"processed_count" => $processed_count
+								);
+
+							}
+						}
+
+					    break;
+			    }
+
+		    }
+
+		    if(isset($result["error"]) && $result["error"])
+		    {
+			    http_response_code(400);
+		    }else{
+			    http_response_code(200);
+		    }
+
+		    \wp_send_json($result);
+	    }
+
 
     }
 

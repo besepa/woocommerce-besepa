@@ -36,8 +36,10 @@ class AssetsManager
 
         $jsContent = ob_get_clean();
 
-        wp_enqueue_script('besepa_checkout', BesepaWooCommerce::getAssetsUrl() . "js/checkout.bank_accounts.js", array('jquery'), 1, true);
+        wp_enqueue_script('besepa_checkout', BesepaWooCommerce::getAssetsUrl() . "js/checkout.bank_accounts.js", array('jquery', 'thickbox'), 1, true);
         wp_add_inline_script( 'besepa_checkout', $jsContent, 'before' );
+
+
 
     }
 
@@ -47,8 +49,8 @@ class AssetsManager
             return;
 
 
-
-        wp_enqueue_style('besepa_checkout', BesepaWooCommerce::getAssetsUrl() . "css/checkout.css");
+	    wp_enqueue_style('thickbox');
+        wp_enqueue_style('besepa_checkout', BesepaWooCommerce::getAssetsUrl() . "css/checkout.css" );
 
 
     }

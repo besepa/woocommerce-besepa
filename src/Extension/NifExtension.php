@@ -22,6 +22,7 @@ class NifExtension
         add_action('woocommerce_checkout_update_order_meta', array($this, 'updateOrderWithFieldData') );
         add_action('woocommerce_admin_order_data_after_billing_address', array($this, 'showInAdminOrder') , 10, 1 );
         add_filter('woocommerce_email_order_meta_keys', array($this, 'showInOrderEmail'));
+	    add_action( 'woocommerce_checkout_update_user_meta', array($this, 'updateUserMeta'));
     }
 
     function addField($checkout)
@@ -30,11 +31,11 @@ class NifExtension
 
         woocommerce_form_field( static::FIELD_NAME , array(
             'type'          => 'text',
-            'class'         => array('my-field-class form-row-wide'),
+            'class'         => array('form-row-wide'),
             'label'         => __('Tu NIF-DNI/CIF', 'besepa'),
             'required'      => true,
             'placeholder'   => __('Introduzca el Nº NIF-DNI o CIF', 'besepa'),
-        ), $checkout->get_value( static::FIELD_NAME ));
+        ), $checkout->get_value( static::FIELD_META_KEY ));
 
     }
 
@@ -51,7 +52,15 @@ class NifExtension
     {
         if ( isset($_POST[static::FIELD_NAME]) && ! empty( $_POST[static::FIELD_NAME] ) ) {
             update_post_meta( $order_id, self::FIELD_META_KEY, sanitize_text_field( $_POST[static::FIELD_NAME] ) );
+
         }
+    }
+
+    function updateUserMeta($customer_id, $posted)
+    {
+	    if (isset($posted[static::FIELD_NAME])) {
+		    update_user_meta( $customer_id, self::FIELD_META_KEY, sanitize_text_field( $posted[static::FIELD_NAME] ));
+	    }
     }
 
 

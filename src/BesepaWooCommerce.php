@@ -4,6 +4,7 @@ namespace Besepa\WCPlugin;
 
 
 use Besepa\Client;
+use Besepa\WCPlugin\Extension\CheckoutRequiredFieldsExtension;
 use Besepa\WCPlugin\Extension\NifExtension;
 use Besepa\WCPlugin\Gateway\BesepaGateway;
 use Besepa\WCPlugin\Repository\BesepaWCRepository;
@@ -104,6 +105,9 @@ class BesepaWooCommerce
     {
         $nif_extension = new NifExtension();
         $nif_extension->init();
+
+	    $required_fields = new CheckoutRequiredFieldsExtension();
+	    $required_fields->init();
     }
 
     function registerGateway( $methods )
@@ -128,5 +132,6 @@ class BesepaWooCommerce
         return static::PREREQUISITES_ALL;
 
     }
+
 
 }

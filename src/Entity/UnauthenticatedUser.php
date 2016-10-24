@@ -36,7 +36,10 @@ class UnauthenticatedUser implements UserInterface
 
     function setCustomerId($besepaCustomerId)
     {
-        $this->session->set(UserInterface::CUSTOMERID_META, $besepaCustomerId);
+	    /**
+	     * Unauthenticated users can´t store besepa customer_ids
+	     */
+	    return null;
     }
 
 
@@ -47,10 +50,10 @@ class UnauthenticatedUser implements UserInterface
 
     function getCustomerId()
     {
-        if(!$this->customerId){
-            $this->customerId = $this->session->get(UserInterface::CUSTOMERID_META);
-        }
-        return $this->customerId;
+	    /**
+	     * Unauthenticated users can´t store besepa customer_ids
+	     */
+        return null;
     }
 
     function getTaxID()

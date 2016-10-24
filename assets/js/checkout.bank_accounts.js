@@ -99,7 +99,8 @@ jQuery(document).ready(function ($) {
 
                 $(document).trigger('besepa_bank_account_created', [{
                     error:        json.error,
-                    bank_account: json.bank_account
+                    bank_account: json.bank_account,
+                    needs_mandate: json.needs_mandate
                 }]);
 
             });
@@ -154,6 +155,10 @@ jQuery(document).ready(function ($) {
             }
             selectBankAccount(result.bank_account.id);
 
+            if(result.needs_mandate)
+            {
+                tb_show('', result.bank_account.mandate_url + '&type=image&TB_iframe=true', false);
+            }
 
         }
 

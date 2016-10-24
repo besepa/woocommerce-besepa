@@ -129,6 +129,9 @@ class AjaxControllers
 
             try{
 
+                /**
+                 * @var $bank_account BankAccount
+                 */
                 if($bank_account = $this->repository->createBankAccount($bank_account, $_GET["besepa_customer_id"])){
 
                     $this->userManager->getUser()->addBankAccount($bank_account);
@@ -138,10 +141,13 @@ class AjaxControllers
                     $return = array(
                         "error"       => false,
                         "bank_account" => array(
-                            'id' => $bank_account->id,
-                            "iban" => $bank_account->iban,
-                            "status" => $bank_account->status
-                        )
+                            'id'            => $bank_account->id,
+                            "iban"          => $bank_account->iban,
+                            "status"        => $bank_account->status,
+                            "mandate_url"   => isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null,
+                        ),
+                        "needs_mandate" => $bank_account->status == BankAccount::STATUS_PENDING_MANDATE
+
                     );
                 }
 
@@ -153,10 +159,13 @@ class AjaxControllers
                     $return = array(
                         "error"       => false,
                         "bank_account" => array(
-                            'id'   => $e->entityInstance->id,
-                            "iban" => $e->entityInstance->iban,
-                            "status" => $e->entityInstance->status
-                        )
+                            'id'            => $e->entityInstance->id,
+                            "iban"          => $e->entityInstance->iban,
+                            "status"        => $e->entityInstance->status,
+                            "mandate_url"   => isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null,
+                        ),
+                        "needs_mandate" => $bank_account->status == BankAccount::STATUS_PENDING_MANDATE
+
                     );
 
             }
