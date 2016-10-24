@@ -146,14 +146,30 @@ class BesepaWCRepository
 	function process( CheckoutData $checkoutData, $subscription_payment = false )
 	{
 
+
+
 	    $customer = null;
 
 	    if($subscription_payment)
         {
-            if($checkoutData->order && $customer_id = get_post_meta($checkoutData->order->id, "besepa_customer_id", true))
+
+            if($checkoutData->order)
             {
-                $customer = $this->getCustomer($customer_id);
+
+                if(is_array($subscription_payment)){
+                    $_subscription_payment = array_shift($subscription_payment);
+                    $subscription_payment  = $_subscription_payment;
+                }
+
+                $customer_id = get_post_meta($subscription_payment->order->id, "besepa_customer_id", true);
+
+                if($customer_id)
+                {
+                    $customer = $this->getCustomer($customer_id);
+                }
             }
+
+
 
         }else{
 
@@ -182,6 +198,7 @@ class BesepaWCRepository
 
             }else{
 
+
                 add_post_meta($checkoutData->order->id, "besepa_bank_account_id", $checkoutData->bankAccount->id, true);
                 add_post_meta($checkoutData->order->id, "besepa_customer_id", $customer->id, true);
                 add_post_meta($checkoutData->order->id, "besepa_debit_id", null, true);
@@ -209,9 +226,11 @@ class BesepaWCRepository
 
         if ($debit = $this->createDebit($checkoutData, $customer)) {
 
-            add_post_meta($checkoutData->order->id, "besepa_bank_account_id", $checkoutData->bankAccount->id, true);
-            add_post_meta($checkoutData->order->id, "besepa_customer_id", $customer->id, true);
-            add_post_meta($checkoutData->order->id, "besepa_debit_id", $debit->id, true);
+            update_post_meta($checkoutData->order->id, "besepa_bank_account_id", $checkoutData->bankAccount->id);
+            update_post_meta($checkoutData->order->id, "besepa_customer_id", $customer->id);
+            update_post_meta($checkoutData->order->id, "besepa_debit_id", $debit->id);
+            update_post_meta($checkoutData->order->id, "besepa_bank_account_unsigned", 0);
+
 
             do_action("besepa.order_processed", $checkoutData->order, $debit, $customer);
 
