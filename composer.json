@@ -6,6 +6,11 @@
   "license": "MIT",
   "authors": [
     {
+      "name": "Besepa Technologies S.L",
+      "email":    "hola@besepa.com",
+      "homepage": "http://besepa.com"
+    },
+    {
       "name":     "Asier Marqués",
       "email":    "asier@simettric.com",
       "homepage": "http://simettric.com"

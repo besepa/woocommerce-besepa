@@ -1,4 +1,20 @@
-=== Besepa for WooCommerce  ===
-Contributors: asiermarques
-Tags: wordpress\", \"plugin\", \"besepa\", \"woocommerce\"
+=== Besepa.com for WooCommerce and WooCommerce Subscriptions ===
+Contributors: besepa
+Tags: woocommerce, woocommerce subscriptions
+Requires at least: 4
+Tested up to: 4.6.1
+Stable tag: 4.6
 License: MIT
+
+Besepa Gateway for WooCommerce and WooCommerce Subscriptions.
+
+== Description ==
+
+Using the Besepa Gateway, your customers can make payments directly from their bank accounts instead using a credit card.
+
+== Installation ==
+
+1. Upload the plugin files to the `/wp-content/plugins/woocommerce-besepa` directory, or install the plugin through the WordPress plugins screen directly.
+2. Activate the plugin through the 'Plugins' screen in WordPress
+3. Use the WooCommerce->Settings screen to configure the besepa gateway
+
