@@ -21,6 +21,10 @@ class BesepaWCRepository
     const WEBHOOK_PARAM = '';
     const META_CUSTOMER_ID = 'besepa.customer_id';
 
+    const SIGNATURE_MODE_FORCE        = "force";
+    const SIGNATURE_MODE_FORM         = "form";
+    const SIGNATURE_MODE_SMS          = "sms";
+
 	/**
 	 * @var Client
 	 */
@@ -67,12 +71,12 @@ class BesepaWCRepository
 
         $repo = $this->client->getRepository("Customer");
 
-        if($items = $repo->query($customer->taxid))
+        if($customer->id && $items = $repo->query($customer->id))
         {
             // if there is another customer and its email is equal to the requested email
             $entityInstance = $items[0];
             foreach ($items as $item){
-                if($customer->contact_email == $item->contact_email)
+                if($customer->id == $item->id)
                 {
                     $entityInstance = $item;
                 }
@@ -95,14 +99,26 @@ class BesepaWCRepository
         return $this->client->getRepository("BankAccount", $customer_id)->find($bank_account_id);
     }
 
+    function getBankAccounts($customer_id, $page=1)
+    {
+        return $this->client->getRepository("BankAccount", $customer_id)->findAll($page);
+    }
+
 
     function createBankAccount(BankAccount $bankAccount, $customer_id)
     {
         $bankAccountRepo = $this->client->getRepository("BankAccount", $customer_id);
 
+
         if($items = $bankAccountRepo->query($bankAccount->iban))
         {
-            throw new ResourceAlreadyExistsException($items[0]);
+            foreach($items as $item)
+            {
+                if($item->iban == $bankAccount->iban)
+                {
+                    throw new ResourceAlreadyExistsException($item);
+                }
+            }
         }
 
         return $bankAccountRepo->create($bankAccount);
@@ -142,6 +158,11 @@ class BesepaWCRepository
 
     }
 
+    function manualSignMandateInBankAccount(BankAccount $account)
+    {
+
+    }
+
 
 	function process( CheckoutData $checkoutData, $subscription_payment = false )
 	{
@@ -174,6 +195,11 @@ class BesepaWCRepository
         }else{
 
             $customer = $this->getCustomer($checkoutData->selectedCustomerId);
+        }
+
+        if(!$customer)
+        {
+            throw new PaymentProcessException();
         }
 
         $checkoutData->bankAccount = $this->getBankAccount($checkoutData->selectedBankAccountId, $customer->id);
@@ -275,4 +301,6 @@ class BesepaWCRepository
 
 
     }
+
+
 }

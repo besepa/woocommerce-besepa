@@ -10,6 +10,7 @@ namespace Besepa\WCPlugin\WordPress;
 
 use Besepa\Entity\BankAccount;
 use Besepa\Entity\Customer;
+use Besepa\Entity\Mandate;
 use Besepa\WCPlugin\Exception\ResourceAlreadyExistsException;
 use Besepa\WCPlugin\Repository\BesepaWCRepository;
 
@@ -46,6 +47,7 @@ class AjaxControllers
         {
             $this->createNewCustomerAction();
             $this->createNewBankAccountAction();
+            $this->checkIfCustomerExistsAction();
         }
 
     }
@@ -56,9 +58,6 @@ class AjaxControllers
         if(!(isset($_GET["besepa_ajax_action"]) && $_GET["besepa_ajax_action"]=="create_customer"))
             return;
 
-
-
-        ini_set("display_errors", 1);
 
         $return = array("error" => true);
 
@@ -113,9 +112,13 @@ class AjaxControllers
 
     }
 
+
+
     function createNewBankAccountAction()
     {
         $return = array("error" => true);
+
+        $sign_mode = BesepaWCRepository::SIGNATURE_MODE_FORCE;
 
         if(!(isset($_GET["besepa_ajax_action"]) && $_GET["besepa_ajax_action"]=="create_bank_account"))
             return;
@@ -127,7 +130,16 @@ class AjaxControllers
             $bank_account = new BankAccount();
             $bank_account->iban = $_GET["besepa_iban"];
 
+            if($sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE)
+            {
+                //firmado manual
+                $bank_account->mandate = new Mandate();
+                $bank_account->mandate->signed_at = date("Y/m/d");
+            }
+
+
             try{
+
 
                 /**
                  * @var $bank_account BankAccount
@@ -138,21 +150,26 @@ class AjaxControllers
 
                     do_action("besepa.bank_account_created", $bank_account);
 
+                    $signature_url_pending_mandate = isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null;
+                    $mandate_url = ($sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE) ? $bank_account->mandate->url : $signature_url_pending_mandate;
+
                     $return = array(
                         "error"       => false,
                         "bank_account" => array(
                             'id'            => $bank_account->id,
                             "iban"          => $bank_account->iban,
                             "status"        => $bank_account->status,
-                            "mandate_url"   => isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null,
+                            "mandate_url"   => $mandate_url,
                         ),
-                        "needs_mandate" => $bank_account->status == BankAccount::STATUS_PENDING_MANDATE
+                        "needs_mandate" => true //$bank_account->status == BankAccount::STATUS_PENDING_MANDATE
 
                     );
                 }
 
             }catch (ResourceAlreadyExistsException $e)
             {
+
+
 
                     $this->userManager->getUser()->addBankAccount($e->entityInstance);
 
@@ -164,7 +181,7 @@ class AjaxControllers
                             "status"        => $e->entityInstance->status,
                             "mandate_url"   => isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null,
                         ),
-                        "needs_mandate" => $bank_account->status == BankAccount::STATUS_PENDING_MANDATE
+                        "needs_mandate" => $sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE || $bank_account->status == BankAccount::STATUS_PENDING_MANDATE
 
                     );
 
@@ -174,5 +191,26 @@ class AjaxControllers
 
         wp_send_json($return);
     }
+
+    function checkIfCustomerExistsAction()
+    {
+
+        if(!(isset($_GET["besepa_ajax_action"]) && $_GET["besepa_ajax_action"]=="check_customer_id"))
+            return;
+
+        if( isset($_GET["besepa_customer_id"]))
+        {
+
+            if($customer = $this->repository->getCustomer($_GET["besepa_customer_id"]))
+            {
+
+                wp_send_json(true);
+            }
+
+        }
+
+        wp_send_json(false);
+    }
+
 
 }

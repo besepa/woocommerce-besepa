@@ -157,7 +157,7 @@ jQuery(document).ready(function ($) {
 
             if(result.needs_mandate)
             {
-                tb_show('', result.bank_account.mandate_url + '&type=image&TB_iframe=true', false);
+                tb_show('', result.bank_account.mandate_url + '#TB_iframe=true', false);
             }
 
         }
@@ -197,29 +197,48 @@ jQuery(document).ready(function ($) {
         if(!billing_first_name_input.val())
             return add_account_field_error.html(besepa_messages.required_first_name).fadeIn();
 
-        if(besepa_user.user_id)
+
+
+        $(this).attr('disabled', 'disabled').html(besepa_messages.adding_bank_account);
+
+
+
+
+        if(besepa_user.customer_id)
         {
 
-            $(this).attr('disabled', 'disabled').html(besepa_messages.adding_bank_account);
+            $.getJSON(window.ajax_url,
+                {besepa_ajax_action: 'check_customer_id', besepa_customer_id: besepa_user.customer_id},
+                function (json) {
 
-            if(besepa_user.customer_id)
-            {
-                createNewBankAccount(
-                    new_bank_account_iban_input.val(),
-                    besepa_user.customer_id);
-            }
-            else
-            {
-                createNewCustomer(
-                    billing_company_input.val(),
-                    billing_taxid_input.val(),
-                    billing_email_input.val(),
-                    billing_first_name_input.val());
-            }
 
-        }else{
-            add_account_field_error.html(besepa_messages.register_is_required).fadeIn();
+                if(json)
+                {
+                    createNewBankAccount(new_bank_account_iban_input.val(), besepa_user.customer_id);
+
+                }else{
+
+                    createNewCustomer(
+                        billing_company_input.val(),
+                        billing_taxid_input.val(),
+                        billing_email_input.val(),
+                        billing_first_name_input.val());
+                }
+
+
+            });
+
+
         }
+        else
+        {
+            createNewCustomer(
+                billing_company_input.val(),
+                billing_taxid_input.val(),
+                billing_email_input.val(),
+                billing_first_name_input.val());
+        }
+
 
     });
 

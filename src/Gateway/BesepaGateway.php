@@ -8,6 +8,7 @@ use Besepa\Exception\DebitCreationException;
 use Besepa\WCPlugin\BesepaWooCommerce;
 use Besepa\WCPlugin\Entity\CheckoutData;
 use Besepa\WCPlugin\Entity\UnauthenticatedUser;
+use Besepa\WCPlugin\Entity\UserInterface;
 use Besepa\WCPlugin\Exception\BankAccountCreationException;
 use Besepa\WCPlugin\Exception\PaymentProcessException;
 use Besepa\WCPlugin\Extension\NifExtension;
@@ -88,6 +89,21 @@ class BesepaGateway extends \WC_Payment_Gateway
 
 	    \add_action('init', array($this, 'listenBesepaWebhook'));
 
+        \add_action( 'user_register', array($this, 'checkoutOnUserRegistered') , 10, 1 );
+
+    }
+
+    public function checkoutOnUserRegistered($user_id)
+    {
+        if(is_checkout())
+        {
+
+            if(isset($_POST["besepa_current_customer_id"]) && !empty($_POST["besepa_current_customer_id"]))
+            {
+                update_user_meta($user_id, UserInterface::CUSTOMERID_META, $_POST["besepa_current_customer_id"]);
+            }
+
+        }
     }
 
     /**
@@ -203,7 +219,17 @@ class BesepaGateway extends \WC_Payment_Gateway
     public function payment_fields()
     {
 
+        $bank_accounts = array();
         $besepaUser = $this->repository->getUserManager()->getUser();
+
+        if($customer_id = $besepaUser->getCustomerId())
+        {
+            if($_accounts = $this->repository->getBankAccounts($customer_id))
+            {
+                $bank_accounts = $_accounts;
+            }
+        }
+
 
         include BesepaWooCommerce::getViewsDir() . 'Gateway/bank_accounts_fields.php';
     }

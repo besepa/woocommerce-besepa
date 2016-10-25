@@ -5,7 +5,6 @@
 	<table id="besepa_bank_accounts">
 <?php
 
-$bank_accounts = $besepaUser->getBankAccounts();
 
 if(count($bank_accounts)){ ?>
 
@@ -18,13 +17,13 @@ if(count($bank_accounts)){ ?>
 $_count=0;
 foreach ($bank_accounts as $bank_account){ ?>
 
-	<tr id="besepa_ba_<?php echo $bank_account["id"] ?>"
+	<tr id="besepa_ba_<?php echo $bank_account->id ?>"
 		class="bank_account <?php echo 0==$_count++ ? "selected": "" ?>">
 
-		<td><?php echo $bank_account["iban"] ?> <span class="status"><?php echo $bank_account["status"] ?></span></td>
+		<td><?php echo $bank_account->iban ?> <span class="status"><?php echo $bank_account->status ?></span></td>
 		<td class="select">
 			<a href="#"
-			   data-id="<?php echo $bank_account["id"] ?>"
+			   data-id="<?php echo $bank_account->id ?>"
 			   class="select_besepa_bank_account">
 				<?php _e("seleccionar", "besepa") ?>
 			</a>
@@ -75,7 +74,11 @@ foreach ($bank_accounts as $bank_account){ ?>
 		</p>
 	</div>
 
-	<input required type="hidden" id="besepa_bank_account_id" name="besepa_selected_bank_account_id" value="<?php echo count($bank_accounts) ? $bank_accounts[0]["id"] : "" ?>">
+
+	<?php
+		$default_bank_account = count($bank_accounts) ? array_shift($bank_accounts) : null;
+	?>
+	<input required type="hidden" id="besepa_bank_account_id" name="besepa_selected_bank_account_id" value="<?php echo $default_bank_account ? $default_bank_account->id : "" ?>">
 	<input required type="hidden" id="besepa_current_customer_id" name="besepa_current_customer_id" value="<?php echo $besepaUser->getCustomerId() ?>">
 
 
