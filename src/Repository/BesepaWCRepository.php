@@ -11,7 +11,6 @@ use Besepa\Entity\Webhook;
 use Besepa\WCPlugin\Exception\BankAccountUnsignedException;
 use Besepa\WCPlugin\Exception\DebitCreationException;
 use Besepa\WCPlugin\Entity\CheckoutData;
-use Besepa\WCPlugin\Entity\UserInterface;
 use Besepa\WCPlugin\Exception\PaymentProcessException;
 use Besepa\WCPlugin\Exception\ResourceAlreadyExistsException;
 use Besepa\WCPlugin\WordPress\UserManager;

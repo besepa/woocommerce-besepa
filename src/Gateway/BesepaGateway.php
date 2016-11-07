@@ -3,16 +3,11 @@
 namespace Besepa\WCPlugin\Gateway;
 
 
-use Besepa\Entity\BankAccount;
-use Besepa\Exception\DebitCreationException;
 use Besepa\WCPlugin\BesepaWooCommerce;
 use Besepa\WCPlugin\Entity\CheckoutData;
-use Besepa\WCPlugin\Entity\UnauthenticatedUser;
 use Besepa\WCPlugin\Entity\UserInterface;
-use Besepa\WCPlugin\Exception\BankAccountCreationException;
 use Besepa\WCPlugin\Exception\BankAccountUnsignedException;
 use Besepa\WCPlugin\Exception\PaymentProcessException;
-use Besepa\WCPlugin\Extension\NifExtension;
 use Besepa\WCPlugin\Repository\BesepaWCRepository;
 
 class BesepaGateway extends \WC_Payment_Gateway
