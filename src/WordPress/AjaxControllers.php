@@ -75,6 +75,25 @@ class AjaxControllers
             $customer->taxid          = $_GET["besepa_tax_id"];
             $customer->contact_name   = $_GET["besepa_first_name"];
             $customer->contact_email  = $_GET["besepa_email"];
+
+            if(isset($_GET["billing_postcode"]) && $_GET["billing_postcode"])
+            {
+                $customer->address_postalcode = $_GET["billing_postcode"];
+            }
+
+            if(isset($_GET["billing_address"]) && $_GET["billing_address"])
+            {
+                $customer->address_street = $_GET["billing_address"];
+            }
+
+            if(isset($_GET["billing_country"]) && $_GET["billing_country"])
+            {
+                $customer->address_country = $_GET["billing_country"];
+            }
+
+
+            //$customer->address_street
+
             $customer->reference      = $this->userManager->getUser()->getRef();
 
 
@@ -151,7 +170,7 @@ class AjaxControllers
                     do_action("besepa.bank_account_created", $bank_account);
 
                     $signature_url_pending_mandate = isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null;
-                    $mandate_url = ($sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE) ? $bank_account->mandate->url : $signature_url_pending_mandate;
+                    $mandate_url                   = ($sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE) ? $bank_account->mandate->url : $signature_url_pending_mandate;
 
                     $return = array(
                         "error"       => false,
@@ -161,29 +180,26 @@ class AjaxControllers
                             "status"        => $bank_account->status,
                             "mandate_url"   => $mandate_url,
                         ),
-                        "needs_mandate" => true //$bank_account->status == BankAccount::STATUS_PENDING_MANDATE
+                        "needs_mandate" => ($bank_account->status == BankAccount::STATUS_PENDING_MANDATE && isset($bank_account->mandate->signature_url))
 
                     );
                 }
 
-            }catch (ResourceAlreadyExistsException $e)
-            {
+            }catch (ResourceAlreadyExistsException $e) {
 
+                $this->userManager->getUser()->addBankAccount($e->entityInstance);
 
+                $return = array(
+                    "error"       => false,
+                    "bank_account" => array(
+                        'id'            => $e->entityInstance->id,
+                        "iban"          => $e->entityInstance->iban,
+                        "status"        => $e->entityInstance->status,
+                        "mandate_url"   => isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null,
+                    ),
+                    "needs_mandate" => $sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE || $bank_account->status == BankAccount::STATUS_PENDING_MANDATE
 
-                    $this->userManager->getUser()->addBankAccount($e->entityInstance);
-
-                    $return = array(
-                        "error"       => false,
-                        "bank_account" => array(
-                            'id'            => $e->entityInstance->id,
-                            "iban"          => $e->entityInstance->iban,
-                            "status"        => $e->entityInstance->status,
-                            "mandate_url"   => isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null,
-                        ),
-                        "needs_mandate" => $sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE || $bank_account->status == BankAccount::STATUS_PENDING_MANDATE
-
-                    );
+                );
 
             }
 
@@ -203,7 +219,6 @@ class AjaxControllers
 
             if($customer = $this->repository->getCustomer($_GET["besepa_customer_id"]))
             {
-
                 wp_send_json(true);
             }
 

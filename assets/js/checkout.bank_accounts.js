@@ -25,6 +25,11 @@ jQuery(document).ready(function ($) {
     var billing_first_name_input;
     var add_account_field_error;
 
+    var address1_input;
+    var address2_input;
+    var postcode_input;
+    var country_input;
+
 
     //hack to select woocommerce fields
     function refreshDomSelection()
@@ -41,6 +46,11 @@ jQuery(document).ready(function ($) {
         billing_taxid_input   = $("#" + window.tax_id_field_id);
         add_account_field_error = $("#add_account_field_error");
 
+        address1_input = $("#billing_address_1");
+        address2_input = $("#billing_address_2");
+        postcode_input = $("#billing_postcode");
+        country_input = $("#billing_country");
+
     }
 
 
@@ -55,14 +65,17 @@ jQuery(document).ready(function ($) {
     }
 
 
-    function createNewCustomer(name, taxId, email, firstName) {
+    function createNewCustomer(name, taxId, email, firstName, postcode, address, country) {
 
         $.getJSON(window.ajax_url,
                   {   besepa_ajax_action: 'create_customer',
                       besepa_company_name: name,
                       besepa_tax_id: taxId,
                       besepa_first_name: firstName,
-                      besepa_email: email
+                      besepa_email: email,
+                      billing_postcode: postcode,
+                      billing_address: address,
+                      billing_country: country
                   },
                   function (json) {
 
@@ -138,7 +151,7 @@ jQuery(document).ready(function ($) {
 
         }else{
 
-            if($("#besepa_ba_"+result.bank_account.id).attr("id"))
+            if($("#besepa_ba_" + result.bank_account.id).attr("id"))
             {
                 $("#besepa_ba_"+result.bank_account.id).fadeOut().fadeIn();
 
@@ -229,14 +242,23 @@ jQuery(document).ready(function ($) {
             });
 
 
-        }
-        else
-        {
+        }else{
+
+            var address = address1_input.val();
+            if(address2_input.val())
+            {
+                address = address + " " + address2_input.val();
+            }
+
             createNewCustomer(
                 billing_company_input.val(),
                 billing_taxid_input.val(),
                 billing_email_input.val(),
-                billing_first_name_input.val());
+                billing_first_name_input.val(),
+                postcode_input.val(),
+                address,
+                country_input.val()
+            );
         }
 
 

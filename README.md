@@ -13,7 +13,7 @@ Opción recomendada. Pronto disponible en el catálogo de plugins de WordPress.
 Requiere composer para instalar las dependencias, pero no utiliza el autoload generado.
 
     cd instalación_wordpress/wp-content/plugins
-    git clone git@github.com:besepa/woocommerce-besepa.git .
+    git clone git@github.com:besepa/woocommerce-besepa.git 
     cd woocommerce-besepa
     composer install
     
