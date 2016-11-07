@@ -24,6 +24,7 @@ foreach ($bank_accounts as $bank_account){ ?>
 		<td class="select">
 			<a href="#"
 			   data-id="<?php echo $bank_account->id ?>"
+			   data-status="<?php echo $bank_account->status ?>"
 			   class="select_besepa_bank_account">
 				<?php _e("seleccionar", "besepa") ?>
 			</a>
@@ -79,6 +80,8 @@ foreach ($bank_accounts as $bank_account){ ?>
 		$default_bank_account = count($bank_accounts) ? array_shift($bank_accounts) : null;
 	?>
 	<input required type="hidden" id="besepa_bank_account_id" name="besepa_selected_bank_account_id" value="<?php echo $default_bank_account ? $default_bank_account->id : "" ?>">
+	<input required type="hidden" id="besepa_bank_account_status" name="besepa_bank_account_status" value="<?php echo $default_bank_account ? $default_bank_account->status : "" ?>">
+
 	<input required type="hidden" id="besepa_current_customer_id" name="besepa_current_customer_id" value="<?php echo $besepaUser->getCustomerId() ?>">
 
 

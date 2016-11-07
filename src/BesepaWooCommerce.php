@@ -67,9 +67,9 @@ class BesepaWooCommerce
 
         $this->registerWooCommerceExtensions();
         $this->registerAssets();
+
+        //Register ajax and ipn controllers
         $this->registerAjaxControllers($besepaRepository);
-
-
     }
 
     function initUserManager()
@@ -99,6 +99,8 @@ class BesepaWooCommerce
     {
         $ajaxControllers = new AjaxControllers($besepaRepository);
         $ajaxControllers->registerControllers();
+
+        add_action('init', array($ajaxControllers, 'listenBesepaWebhook'));
     }
 
     function registerWooCommerceExtensions()

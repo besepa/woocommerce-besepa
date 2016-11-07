@@ -10,6 +10,7 @@ use Besepa\WCPlugin\Entity\CheckoutData;
 use Besepa\WCPlugin\Entity\UnauthenticatedUser;
 use Besepa\WCPlugin\Entity\UserInterface;
 use Besepa\WCPlugin\Exception\BankAccountCreationException;
+use Besepa\WCPlugin\Exception\BankAccountUnsignedException;
 use Besepa\WCPlugin\Exception\PaymentProcessException;
 use Besepa\WCPlugin\Extension\NifExtension;
 use Besepa\WCPlugin\Repository\BesepaWCRepository;
@@ -68,6 +69,7 @@ class BesepaGateway extends \WC_Payment_Gateway
 
 		$this->initSubscribers();
 
+
         \apply_filters(static::FILTER_ON_INSTANTIATED, $this);
     }
 
@@ -86,8 +88,6 @@ class BesepaGateway extends \WC_Payment_Gateway
 			              array( $this, 'process_admin_options' ) );
 
 	    }
-
-	    \add_action('init', array($this, 'listenBesepaWebhook'));
 
         \add_action( 'user_register', array($this, 'checkoutOnUserRegistered') , 10, 1 );
 
@@ -163,7 +163,8 @@ class BesepaGateway extends \WC_Payment_Gateway
 
         $this->repository->configure(
         	$this->get_option("api_key"),
-	        $this->get_option("api_account_id")
+	        $this->get_option("api_account_id"),
+            $this->get_option("sign_mode")
         );
     }
 
@@ -201,6 +202,18 @@ class BesepaGateway extends \WC_Payment_Gateway
 	            'title'		=> __( 'ID Account de Besepa', 'besepa' ),
 	            'type'		=> 'text',
 	            'desc_tip'	=> __( 'EL identificador de tu cuenta en Besepa.', 'besepa' ),
+            ),
+            'sign_mode' => array(
+                'title'		  => __( 'Modo de firmado de cuentas', 'besepa' ),
+                'label'		  => __( 'Firmado de cuentas', 'besepa' ),
+                'type'		  => 'select',
+                'desc_tip' => __( 'Al añadir una cuenta bancaria, qué criterio establecer para firmar sus mandatos.', 'besepa' ),
+                'default'	  => 'force',
+                'options'     => array(
+                    BesepaWCRepository::SIGNATURE_MODE_FORCE => __('Forzar firmado', 'besepa'),
+                    BesepaWCRepository::SIGNATURE_MODE_FORM => __('Firmado por formulario', 'besepa'),
+                    BesepaWCRepository::SIGNATURE_MODE_SMS => __('Firmado por SMS', 'besepa')
+                )
             ),
             'environment' => array(
                 'title'		  => __( 'Modo test', 'besepa' ),
@@ -286,42 +299,47 @@ class BesepaGateway extends \WC_Payment_Gateway
             $checkoutData->selectedCustomerId    = $customer_id;
 
 
-		    if($this->repository->process($checkoutData)){
 
+
+            try{
+                if($this->repository->process($checkoutData)){
+
+                    $order->reduce_order_stock();
+                    $order->payment_complete();
+
+                    if( $this->subscription_support &&
+                        wcs_order_contains_subscription( $order ) )
+                    {
+
+                        \WC_Subscriptions_Manager::activate_subscriptions_for_order( $order );
+                        $order->update_status('completed', __( 'Pedido de suscripción completado correctamente', 'besepa' ));
+
+                    }
+
+                    \WC()->cart->empty_cart();
+
+                    return array(
+                        'result' => 'success',
+                        'redirect' => $this->get_return_url( $order )
+                    );
+
+                }
+
+            }catch (BankAccountUnsignedException $e)
+            {
+                $order = $e->checkoutData->order;
+
+                $order->update_status('pending', __( 'La cuenta bancaria no está activada, el pedido se ha completado pero queda pendiente de pago', 'besepa' ));
                 $order->reduce_order_stock();
-			    $order->payment_complete();
 
-			    if( $this->subscription_support &&
-			        \WC_Subscriptions_Order::order_contains_subscription( $order_id ) )
-			    {
+                \WC()->cart->empty_cart();
 
-				    \WC_Subscriptions_Manager::activate_subscriptions_for_order( $order );
-				    $order->update_status('completed', __( 'Pedido de suscripción completado correctamente', 'besepa' ));
+                return array(
+                    'result' => 'success',
+                    'redirect' => $this->get_return_url( $order )
+                );
 
-			    }
-
-			    \WC()->cart->empty_cart();
-
-			    return array(
-				    'result' => 'success',
-				    'redirect' => $this->get_return_url( $order )
-			    );
-
-		    }else if($checkoutData->bankAccount &&
-		             $checkoutData->bankAccount->status == BankAccount::STATUS_ACTIVE)
-		    {
-
-		    	// Payment processed but not charged because the account is not active
-
-			    $order->update_status('pending', __( 'La cuenta bancaria no está activada, el pedido se ha completado pero queda pendiente de pago', 'besepa' ));
-			    $order->reduce_order_stock();
-			    \WC()->cart->empty_cart();
-
-			    return array(
-				    'result' => 'success',
-				    'redirect' => $this->get_return_url( $order )
-			    );
-		    }
+            }
 
 
 	    }catch (PaymentProcessException $e)
@@ -355,80 +373,6 @@ class BesepaGateway extends \WC_Payment_Gateway
 	    return $result;
     }
 
-    function listenBesepaWebhook()
-    {
-
-    	$result = array('error'=>true);
-
-	    if(isset($_GET[ BesepaWCRepository::WEBHOOK_PARAM ]))
-	    {
-		    $json = file_get_contents('php://input');
-		    $notification = json_decode($json, true);
-
-		    if(isset($notification["event"]))
-		    {
-
-		    	switch ($notification["event"])
-			    {
-			    	case 'mandate.signed';
-
-						$processed_count=0;
-
-					    $bank_account_data = $notification["data"];
-						if(isset($bank_account_data["id"]))
-						{
-							$bank_account = $this->repository->getBankAccount($bank_account_data["id"], $bank_account_data["customer_id"]);
-
-							if($bank_account)
-							{
-								$pending_orders = get_posts( array(
-									'numberposts' => -1,
-									'meta_key'    => 'besepa_bank_account_unsigned',
-									'meta_value'  => 1,
-									'post_type'   => wc_get_order_types(),
-									'post_status' => array_keys( wc_get_order_statuses() ),
-								));
-
-								if(is_array($pending_orders))
-								{
-									foreach($pending_orders as $order_post)
-									{
-										$order = wc_get_order($order_post);
-										if($order->get_status() == "pending")
-										{
-
-											if($this->repository->processPendingOrder($order, $bank_account))
-											{
-												$processed_count++;
-											}
-
-										}
-									}
-								}
-								$result = array(
-									"processed_count" => $processed_count
-								);
-
-							}
-						}
-
-					    break;
-			    }
-
-		    }
-
-		    if(isset($result["error"]) && $result["error"])
-		    {
-			    http_response_code(400);
-		    }else{
-			    http_response_code(200);
-		    }
-
-		    \wp_send_json($result);
-	    }
-
-
-    }
 
 
 }

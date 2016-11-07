@@ -9,7 +9,7 @@ jQuery(document).ready(function ($) {
 
     var bank_row_tpl =  '<tr id="besepa_ba_[id]" class="bank_account">' +
                         '<td>[iban] <span class="status">[status]</span></td>' +
-                        '<td class="select"><a href="#" data-id="[id]" class="select_besepa_bank_account">' +
+                        '<td class="select"><a href="#" data-id="[id]" data-status="[status]" class="select_besepa_bank_account">' +
                         besepa_messages.select_bank_account + '</a> </td></tr>';
 
 
@@ -29,6 +29,7 @@ jQuery(document).ready(function ($) {
     var address2_input;
     var postcode_input;
     var country_input;
+    var bank_account_selected_status_input;
 
 
     //hack to select woocommerce fields
@@ -36,6 +37,7 @@ jQuery(document).ready(function ($) {
     {
         bank_accounts_list             = $('#besepa_bank_accounts');
         bank_account_selected_input    = $('#besepa_bank_account_id');
+        bank_account_selected_status_input = $('#besepa_bank_account_status');
         current_customer_input         = $('#besepa_current_customer_id');
         new_bank_account_iban_input    = $('#besepa_new_iban');
         payment_method_checkbox_besepa = $("#payment_method_besepa");
@@ -54,13 +56,14 @@ jQuery(document).ready(function ($) {
     }
 
 
-    function selectBankAccount(id) {
+    function selectBankAccount(id, status) {
 
 
         $('.bank_account').removeClass('selected');
         $('#besepa_ba_'+id).addClass('selected');
 
         bank_account_selected_input.val(id);
+        bank_account_selected_status_input.val(status);
 
     }
 
@@ -163,6 +166,7 @@ jQuery(document).ready(function ($) {
                 html = html.replace('[id]', result.bank_account.id);
                 html = html.replace('[id]', result.bank_account.id);
                 html = html.replace('[status]', result.bank_account.status);
+                html = html.replace('[status]', result.bank_account.status);
                 bank_accounts_list.append($(html));
 
             }
@@ -184,7 +188,7 @@ jQuery(document).ready(function ($) {
         refreshDomSelection();
         e.preventDefault();
 
-        selectBankAccount($(this).attr("data-id"));
+        selectBankAccount($(this).attr("data-id"), $(this).attr("data-status"));
     });
 
     $(document).on('click', '#besepa_register_bc', function (e)

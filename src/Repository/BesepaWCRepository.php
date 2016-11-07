@@ -8,6 +8,7 @@ use Besepa\Entity\BankAccount;
 use Besepa\Entity\Customer;
 use Besepa\Entity\Debit;
 use Besepa\Entity\Webhook;
+use Besepa\WCPlugin\Exception\BankAccountUnsignedException;
 use Besepa\WCPlugin\Exception\DebitCreationException;
 use Besepa\WCPlugin\Entity\CheckoutData;
 use Besepa\WCPlugin\Entity\UserInterface;
@@ -18,7 +19,7 @@ use Besepa\WCPlugin\WordPress\UserManager;
 class BesepaWCRepository
 {
 
-    const WEBHOOK_PARAM = '';
+    const WEBHOOK_PARAM = 'besepa_ipn';
     const META_CUSTOMER_ID = 'besepa.customer_id';
 
     const SIGNATURE_MODE_FORCE        = "force";
@@ -30,6 +31,8 @@ class BesepaWCRepository
 	 */
 	private $client;
 
+    private $signMode;
+
     /**
      * @var UserManager
      */
@@ -40,10 +43,17 @@ class BesepaWCRepository
         $this->userManager = $userManager;
 	}
 
-	function configure( $api_key, $account_id )
+	function configure( $api_key, $account_id, $sign_mode )
 	{
 		$this->client->init( $api_key, $account_id );
+        $this->signMode = $sign_mode;
 	}
+
+	function getSignMode()
+    {
+        return $this->signMode?:static::SIGNATURE_MODE_FORCE;
+    }
+
 
     /**
      * @return UserManager
@@ -208,7 +218,7 @@ class BesepaWCRepository
         if( $customer && $checkoutData->bankAccount )
         {
 
-            if($checkoutData->bankAccount->status = BankAccount::STATUS_ACTIVE)
+            if($checkoutData->bankAccount->status == BankAccount::STATUS_ACTIVE)
             {
 
                 if ($debit = $this->createDebit($checkoutData, $customer)) {
@@ -226,11 +236,13 @@ class BesepaWCRepository
 
 
                 add_post_meta($checkoutData->order->id, "besepa_bank_account_id", $checkoutData->bankAccount->id, true);
+                add_post_meta($checkoutData->order->id, "besepa_unsigned_bank_account_id", $checkoutData->bankAccount->id, true);
+
                 add_post_meta($checkoutData->order->id, "besepa_customer_id", $customer->id, true);
                 add_post_meta($checkoutData->order->id, "besepa_debit_id", null, true);
                 add_post_meta($checkoutData->order->id, "besepa_bank_account_unsigned", 1, true);
 
-                return false;
+                throw new BankAccountUnsignedException($checkoutData);
             }
 
 
@@ -255,8 +267,8 @@ class BesepaWCRepository
             update_post_meta($checkoutData->order->id, "besepa_bank_account_id", $checkoutData->bankAccount->id);
             update_post_meta($checkoutData->order->id, "besepa_customer_id", $customer->id);
             update_post_meta($checkoutData->order->id, "besepa_debit_id", $debit->id);
-            update_post_meta($checkoutData->order->id, "besepa_bank_account_unsigned", 0);
-
+            delete_post_meta($checkoutData->order->id, "besepa_bank_account_unsigned");
+            delete_post_meta($checkoutData->order->id, "besepa_unsigned_bank_account_id");
 
             do_action("besepa.order_processed", $checkoutData->order, $debit, $customer);
 
@@ -289,7 +301,7 @@ class BesepaWCRepository
         if($create)
         {
             $webhook = new Webhook();
-            $webhook->url = (get_site_url() . '/?besepa_webhook_listener=true');
+            $webhook->url = (get_site_url() . '/?' . static::WEBHOOK_PARAM .'=true');
 
             if($webhook = $repo->create($webhook))
             {

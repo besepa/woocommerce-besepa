@@ -137,7 +137,7 @@ class AjaxControllers
     {
         $return = array("error" => true);
 
-        $sign_mode = BesepaWCRepository::SIGNATURE_MODE_FORCE;
+        $sign_mode = $this->repository->getSignMode();
 
         if(!(isset($_GET["besepa_ajax_action"]) && $_GET["besepa_ajax_action"]=="create_bank_account"))
             return;
@@ -156,6 +156,13 @@ class AjaxControllers
                 $bank_account->mandate->signed_at = date("Y/m/d");
             }
 
+            if($sign_mode == BesepaWCRepository::SIGNATURE_MODE_SMS)
+            {
+                $bank_account->mandate = new Mandate();
+                $bank_account->mandate->scheme = "B2B";
+                $bank_account->mandate->signature_type = "sms";
+            }
+
 
             try{
 
@@ -169,7 +176,7 @@ class AjaxControllers
 
                     do_action("besepa.bank_account_created", $bank_account);
 
-                    $signature_url_pending_mandate = isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null;
+                    $signature_url_pending_mandate = isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : $bank_account->mandate->url;
                     $mandate_url                   = ($sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE) ? $bank_account->mandate->url : $signature_url_pending_mandate;
 
                     $return = array(
@@ -180,7 +187,7 @@ class AjaxControllers
                             "status"        => $bank_account->status,
                             "mandate_url"   => $mandate_url,
                         ),
-                        "needs_mandate" => ($bank_account->status == BankAccount::STATUS_PENDING_MANDATE && isset($bank_account->mandate->signature_url))
+                        "needs_mandate" => ($bank_account->status == BankAccount::STATUS_PENDING_MANDATE && $signature_url_pending_mandate)
 
                     );
                 }
@@ -195,9 +202,9 @@ class AjaxControllers
                         'id'            => $e->entityInstance->id,
                         "iban"          => $e->entityInstance->iban,
                         "status"        => $e->entityInstance->status,
-                        "mandate_url"   => isset($bank_account->mandate->signature_url) ? $bank_account->mandate->signature_url : null,
+                        "mandate_url"   => isset($e->entityInstance->mandate->url) ? $e->entityInstance->mandate->url : null,
                     ),
-                    "needs_mandate" => $sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE || $bank_account->status == BankAccount::STATUS_PENDING_MANDATE
+                    "needs_mandate" => $sign_mode == BesepaWCRepository::SIGNATURE_MODE_FORCE || $e->entityInstance->status == BankAccount::STATUS_PENDING_MANDATE
 
                 );
 
@@ -225,6 +232,99 @@ class AjaxControllers
         }
 
         wp_send_json(false);
+    }
+
+
+    function listenBesepaWebhook()
+    {
+
+        $result = array('error'=>true);
+
+
+        if(isset($_GET[ BesepaWCRepository::WEBHOOK_PARAM ]))
+        {
+
+
+            $json = file_get_contents('php://input');
+            $notification = json_decode($json, true);
+
+            if(isset($notification["event"]))
+            {
+
+
+
+                switch ($notification["event"])
+                {
+                    case 'mandate.signed';
+
+                        $processed_count=0;
+
+                        $bank_account_data = $notification["data"];
+                        if(isset($bank_account_data["id"]))
+                        {
+                            $bank_account = $this->repository->getBankAccount($bank_account_data["id"], $bank_account_data["customer_id"]);
+
+                            if($bank_account)
+                            {
+                                $pending_orders = get_posts( array(
+                                    'numberposts' => -1,
+                                    'meta_key'    => 'besepa_unsigned_bank_account_id',
+                                    'meta_value'  => $bank_account->id,
+                                    'post_type'   => wc_get_order_types(),
+                                    'post_status' => array_keys( wc_get_order_statuses() ),
+                                ));
+
+                                if(is_array($pending_orders))
+                                {
+                                    foreach($pending_orders as $order_post)
+                                    {
+                                        $order = wc_get_order($order_post);
+                                        if($order->get_status() == "pending")
+                                        {
+
+                                            if($this->repository->processPendingOrder($order, $bank_account))
+                                            {
+                                                $order->payment_complete();
+
+                                                if(function_exists('wcs_order_contains_subscription'))
+                                                {
+                                                    if( wcs_order_contains_subscription( $order->id ) )
+                                                    {
+                                                        \WC_Subscriptions_Manager::activate_subscriptions_for_order( $order );
+                                                    }
+                                                }
+
+                                                $order->update_status('completed', __( 'Pedido de suscripción completado correctamente', 'besepa' ));
+
+                                                $processed_count++;
+                                            }
+
+                                        }
+                                    }
+                                }
+                                $result = array(
+                                    "processed_count" => $processed_count
+                                );
+
+                            }
+                        }
+
+                        break;
+                }
+
+            }
+
+            if(isset($result["error"]) && $result["error"])
+            {
+                http_response_code(400);
+            }else{
+                http_response_code(200);
+            }
+
+            \wp_send_json($result);
+        }
+
+
     }
 
 
