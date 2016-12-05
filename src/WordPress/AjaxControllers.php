@@ -81,9 +81,24 @@ class AjaxControllers
                 $customer->address_postalcode = $_GET["billing_postcode"];
             }
 
-            if(isset($_GET["billing_address"]) && $_GET["billing_address"])
+            if(isset($_GET["billing_address_1"]) && $_GET["billing_address_1"])
             {
-                $customer->address_street = $_GET["billing_address"];
+                $customer->address_street = $_GET["billing_address_1"];
+            }
+
+            if(isset($_GET["billing_address_2"]) && $_GET["billing_address_2"])
+            {
+                $customer->address_street = $customer->address_street + $_GET["billing_address_2"];
+            }
+
+            if(isset($_GET["billing_city"]) && $_GET["billing_city"])
+            {
+                $customer->address_city = $_GET["billing_city"];
+            }
+
+            if(isset($_GET["billing_state"]) && $_GET["billing_state"])
+            {
+                $customer->address_state = $_GET["billing_state"];
             }
 
             if(isset($_GET["billing_country"]) && $_GET["billing_country"])
