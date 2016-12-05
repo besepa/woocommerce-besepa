@@ -82,7 +82,7 @@ foreach ($bank_accounts as $bank_account){ ?>
 	<input required type="hidden" id="besepa_bank_account_id" name="besepa_selected_bank_account_id" value="<?php echo $default_bank_account ? $default_bank_account->id : "" ?>">
 	<input required type="hidden" id="besepa_bank_account_status" name="besepa_bank_account_status" value="<?php echo $default_bank_account ? $default_bank_account->status : "" ?>">
 
-	<input required type="hidden" id="besepa_current_customer_id" name="besepa_current_customer_id" value="<?php echo $besepaUser->getCustomerId() ?>">
+	<input required type="hidden" id="besepa_current_customer_id" name="besepa_current_customer_id" value="<?php echo $customer_id ?>">
 
 
 	<script type="text/javascript">

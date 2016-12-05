@@ -228,9 +228,15 @@ class BesepaGateway extends \WC_Payment_Gateway
     {
 
         $bank_accounts = array();
-        $besepaUser    = $this->repository->getUserManager()->getUser();
+        $besepaUser  = $this->repository->getUserManager()->getUser();
+        $customer_id = $besepaUser->getCustomerId();
 
-        if($customer_id = $besepaUser->getCustomerId())
+        if(!$customer_id)
+        {
+            $customer_id = WC()->session->get("customer_id", false);
+        }
+
+        if($customer_id)
         {
             if($_accounts = $this->repository->getBankAccounts($customer_id))
             {

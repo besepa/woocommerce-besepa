@@ -40,6 +40,7 @@ jQuery(document).ready(function ($) {
         bank_accounts_list             = $('#besepa_bank_accounts');
         bank_account_selected_input    = $('#besepa_bank_account_id');
         bank_account_selected_status_input = $('#besepa_bank_account_status');
+
         current_customer_input         = $('#besepa_current_customer_id');
         new_bank_account_iban_input    = $('#besepa_new_iban');
         payment_method_checkbox_besepa = $("#payment_method_besepa");
@@ -241,6 +242,11 @@ jQuery(document).ready(function ($) {
 
                 if(json)
                 {
+                    if(!current_customer_input.val())
+                    {
+                        current_customer_input.val(besepa_user.customer_id);
+                    }
+
                     createNewBankAccount(new_bank_account_iban_input.val(), besepa_user.customer_id);
 
                 }else{

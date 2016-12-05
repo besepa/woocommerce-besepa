@@ -116,6 +116,8 @@ class AjaxControllers
 
                     do_action("besepa.customer_created", $customer);
 
+                    WC()->session->set("customer_id", $customer->id);
+
                     $return = array(
                         "error"       => false,
                         "customer_id" => $customer->id
