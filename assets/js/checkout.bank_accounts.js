@@ -28,6 +28,8 @@ jQuery(document).ready(function ($) {
     var address1_input;
     var address2_input;
     var postcode_input;
+    var city_input;
+    var state_input;
     var country_input;
     var bank_account_selected_status_input;
 
@@ -52,6 +54,8 @@ jQuery(document).ready(function ($) {
         address2_input = $("#billing_address_2");
         postcode_input = $("#billing_postcode");
         country_input = $("#billing_country");
+        city_input = $("#billing_city");
+        state_input = $("#billing_state");
 
     }
 
@@ -68,7 +72,7 @@ jQuery(document).ready(function ($) {
     }
 
 
-    function createNewCustomer(name, taxId, email, firstName, postcode, address, country) {
+    function createNewCustomer(name, taxId, email, firstName, postcode, address, city, state, country) {
 
         $.getJSON(window.ajax_url,
                   {   besepa_ajax_action: 'create_customer',
@@ -78,6 +82,8 @@ jQuery(document).ready(function ($) {
                       besepa_email: email,
                       billing_postcode: postcode,
                       billing_address: address,
+                      billing_city: city,
+                      billing_state: state,
                       billing_country: country
                   },
                   function (json) {
@@ -219,7 +225,11 @@ jQuery(document).ready(function ($) {
         $(this).attr('disabled', 'disabled').html(besepa_messages.adding_bank_account);
 
 
-
+        var address = address1_input.val();
+        if(address2_input.val())
+        {
+            address = address + " " + address2_input.val();
+        }
 
         if(besepa_user.customer_id)
         {
@@ -239,7 +249,12 @@ jQuery(document).ready(function ($) {
                         billing_company_input.val(),
                         billing_taxid_input.val(),
                         billing_email_input.val(),
-                        billing_first_name_input.val());
+                        billing_first_name_input.val(),
+                        postcode_input.val(),
+                        address,
+                        city_input.val(),
+                        state_input.val(),
+                        country_input.val());
                 }
 
 
@@ -248,11 +263,7 @@ jQuery(document).ready(function ($) {
 
         }else{
 
-            var address = address1_input.val();
-            if(address2_input.val())
-            {
-                address = address + " " + address2_input.val();
-            }
+
 
             createNewCustomer(
                 billing_company_input.val(),
@@ -261,6 +272,8 @@ jQuery(document).ready(function ($) {
                 billing_first_name_input.val(),
                 postcode_input.val(),
                 address,
+                city_input.val(),
+                state_input.val(),
                 country_input.val()
             );
         }
