@@ -1,74 +1,62 @@
 <?php
 /**
- * Created by Asier Marqués <asiermarques@gmail.com>
- * Date: 30/8/16
- * Time: 17:42
+ *
+ *
+ * @author Asier Marqués <asiermarques@gmail.com>
  */
 
 namespace Besepa\WCPlugin\Entity;
 
 
-use Besepa\Entity\BankAccount;
-
-class User implements UserInterface
+class User
 {
 
+    const META_CUSTOMER_ID = 'besepa_customer_id';
+
+    const META_TAX_ID  = "besepa_taxid";
+
+    private $user_id;
+
+    function __construct($wp_user_id)
+    {
+        $this->user_id = $wp_user_id;
+    }
+
+
+    function getTaxId()
+    {
+        return get_user_meta($this->user_id, static::META_TAX_ID, true);
+    }
+
+    function setTaxId($taxId)
+    {
+        return update_user_meta($this->user_id, static::META_TAX_ID, $taxId);
+    }
+
     /**
-     * @var \WP_User
+     * @return string
      */
-    private $user;
-
-    function __construct(\WP_User $user)
-    {
-        $this->user = $user;
-    }
-
-    function getID()
-    {
-        return $this->user->ID;
-    }
-
     function getCustomerId()
     {
-        return get_user_meta($this->user->ID, UserInterface::CUSTOMERID_META, true);
+        return get_user_meta($this->user_id, static::META_CUSTOMER_ID, true);
     }
 
-    function setCustomerId($besepaCustomerId)
+    /**
+     * @param $besepa_customer_id
+     * @return void
+     */
+    function setCustomerId($besepa_customer_id)
     {
-        return update_user_meta($this->user->ID, UserInterface::CUSTOMERID_META, $besepaCustomerId);
+         update_user_meta($this->user_id, static::META_CUSTOMER_ID, $besepa_customer_id);
     }
 
-    function getTaxID()
+    /**
+     * @return false|\WP_User
+     */
+    function getWordPressUser()
     {
-        return update_user_meta($this->user->ID, UserInterface::TAXID_META);
+        return get_userdata($this->user_id);
     }
 
-    function getRef()
-    {
-       return "wc_user_" . $this->user->ID;
-    }
 
-    function getEmail()
-    {
-        return $this->user->user_email;
-    }
-
-    function getName()
-    {
-        return $this->user->display_name;
-    }
-
-    function addBankAccount(BankAccount $bankAccount)
-    {
-        $bank_accounts = $this->getBankAccounts();
-        $bank_accounts[$bankAccount->id] = $bankAccount;
-
-        update_user_meta($this->user->ID, UserInterface::BANKACCOUNTS_META, json_encode($bank_accounts));
-    }
-
-    function getBankAccounts()
-    {
-        $bank_accounts = json_decode(get_user_meta($this->user->ID, UserInterface::BANKACCOUNTS_META, true), true);
-        return $bank_accounts?:array();
-    }
 }

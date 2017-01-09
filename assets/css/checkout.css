@@ -1,31 +1,50 @@
-#besepa_bank_accounts tr.selected td{
-    font-weight: bolder;
-    background-color: #FAFAD2!important;
+#besepa_page_content
+{
+    font-size: 12px;
 }
-#besepa_bank_accounts tr td.select{
+#besepa_page_content .right
+{
+    text-align: right;
+}
+#besepa_page_content .center
+{
     text-align: center;
 }
-#besepa_bank_accounts tr td.select a{
-    color: #000;
+#besepa_page_content table.besepa_table{
+    border: none;
+    text-align: left;
 }
-#besepa_bank_accounts span.status{
-    background: #000;
-    color: #fff;
-    font-size: 12px;
-    padding: 4px 8px;
-    margin-left: 12px;
-    border-radius: 2px;
+#besepa_page_content table.besepa_table td,#besepa_page_content table.besepa_table th{
+    border: none;
+    border-bottom: 1px solid #ccc;
+    padding: 10px;
 }
 
-#add_account_field h3{
-    margin-bottom: 0;
-    margin-top: 36px;
+#besepa_page_content h1
+{
+    font-size: 28px;
+    font-weight: normal;
+}
+#besepa_page_content h4
+{
+    font-size: 22px;
+    font-weight: normal;
+    border-bottom: 1px solid #eee;
 }
 
-#add_account_field_error{
-    margin: 10px 0 20px 0;
-    background: #8b0000;
-    color: #fff;
-    padding: 10px 15px;
-}
+#besepa_page_content button
+{
 
+    margin-bottom: 20px;
+    border: 1px solid #e1e1e1;
+    background: #eee;
+
+}
+#besepa_page_content .error{ background: #ff6666; color: #fff; padding: 20px; font-size: 14px; text-align: center; margin-bottom: 20px }
+#besepa_page_content label { display: block; }
+#besepa_page_content .field input[type=text] { width: 80%; padding: 10px; }
+#besepa_page_content .form_container{ padding: 20px; background: #eee; margin-bottom: 20px }
+#besepa_page_content .form_container button.cta{ background: #666; color:#fff; margin-bottom: 0 }
+
+#besepa_page_content .besepa_payment{text-align: center}
+#besepa_page_content .besepa_payment button.cta{ background: #000; color:#fff; margin: 10px 0; text-transform: uppercase; padding: 10px 20px}

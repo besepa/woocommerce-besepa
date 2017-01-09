@@ -5,15 +5,14 @@ namespace Besepa\WCPlugin;
 
 use Besepa\Client;
 use Besepa\WCPlugin\Extension\CheckoutRequiredFieldsExtension;
-use Besepa\WCPlugin\Extension\NifExtension;
 use Besepa\WCPlugin\Gateway\BesepaGateway;
-use Besepa\WCPlugin\Repository\BesepaWCRepository;
-use Besepa\WCPlugin\WordPress\AjaxControllers;
 use Besepa\WCPlugin\WordPress\AssetsManager;
-use Besepa\WCPlugin\WordPress\UserManager;
+use Besepa\WCPlugin\WordPress\BesepaControllers;
 
 class BesepaWooCommerce
 {
+
+    const LANG_DOMAIN = "besepa";
 
     const PREREQUISITES_FAIL = 0;
     const PREREQUISITES_WOOCOMMERCE = 1;
@@ -21,12 +20,10 @@ class BesepaWooCommerce
 
     static $PLUGIN_FILE_PATH = '';
 
-    private $userManager;
 
     function __construct($plugin_file)
     {
         static::$PLUGIN_FILE_PATH = $plugin_file;
-        $this->userManager = new UserManager();
     }
 
     static function getViewsDir()
@@ -44,19 +41,16 @@ class BesepaWooCommerce
     {
         if($this->checkPrerequisites() === static::PREREQUISITES_FAIL) return;
 
-        $this->initUserManager();
 
-        $besepaRepository = new BesepaWCRepository(new Client(), $this->userManager);
+        $service = new BesepaService(new Client());
 
         \add_action( 'woocommerce_payment_gateways', array($this, "registerGateway") );
 
-        $plugin = $this;
-
-        \add_filter(BesepaGateway::FILTER_ON_INSTANTIATED, function (BesepaGateway $gateway)
-                                                                use ($besepaRepository)
+        \add_filter(BesepaGateway::FILTER_ON_INSTANTIATED,
+                            function (BesepaGateway $gateway) use ($service)
         {
 
-        	$gateway->setRepository($besepaRepository);
+        	$gateway->setBesepaService($service);
 
 	        if($this->checkPrerequisites() === static::PREREQUISITES_ALL){
 	        	$gateway->setSubscriptionSupport(true);
@@ -69,45 +63,30 @@ class BesepaWooCommerce
         $this->registerAssets();
 
         //Register ajax and ipn controllers
-        $this->registerAjaxControllers($besepaRepository);
+        $this->registerControllers($service);
     }
 
-    function initUserManager()
-    {
 
-        if(\is_admin())
-            return;
-
-        $userManager = $this->userManager;
-
-        \add_action('woocommerce_init', function () use($userManager){
-            $userManager->onInit(\WooCommerce::instance()->session);
-        });
-
-    }
 
     function registerAssets()
     {
-        $assetManager = new AssetsManager($this->userManager);
+        $assetManager = new AssetsManager();
 
         \add_action( 'wp_enqueue_scripts', array($assetManager, 'registerCheckoutScripts') );
         \add_action( 'wp_enqueue_scripts', array($assetManager, 'registerCheckoutStyles') );
 
     }
 
-    function registerAjaxControllers(BesepaWCRepository $besepaRepository)
+    function registerControllers(BesepaService $service)
     {
-        $ajaxControllers = new AjaxControllers($besepaRepository);
-        $ajaxControllers->registerControllers();
+        $ajaxControllers = new BesepaControllers($service);
+        $ajaxControllers->registerAjaxControllers();
+        $ajaxControllers->registerWebHookControllers();
 
-        add_action('init', array($ajaxControllers, 'listenBesepaWebhook'));
     }
 
     function registerWooCommerceExtensions()
     {
-        $nif_extension = new NifExtension();
-        $nif_extension->init();
-
 	    $required_fields = new CheckoutRequiredFieldsExtension();
 	    $required_fields->init();
     }

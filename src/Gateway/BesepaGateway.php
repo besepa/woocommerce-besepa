@@ -3,17 +3,23 @@
 namespace Besepa\WCPlugin\Gateway;
 
 
+use Besepa\Entity\BankAccount;
+use Besepa\Entity\Customer;
+use Besepa\WCPlugin\BesepaService;
 use Besepa\WCPlugin\BesepaWooCommerce;
-use Besepa\WCPlugin\Entity\CheckoutData;
-use Besepa\WCPlugin\Entity\UserInterface;
-use Besepa\WCPlugin\Exception\BankAccountUnsignedException;
-use Besepa\WCPlugin\Exception\PaymentProcessException;
-use Besepa\WCPlugin\Repository\BesepaWCRepository;
+use Besepa\WCPlugin\Entity\User;
+use Besepa\WCPlugin\Exception\CustomerCreationException;
 
 class BesepaGateway extends \WC_Payment_Gateway
 {
 
     const FILTER_ON_INSTANTIATED = 'besepa_wc_gateway.instantiated';
+
+    const META_DEBIT_ID        = "besepa_debit_id";
+    const META_CUSTOMER_ID     = "besepa_customer_id";
+    const META_BANK_ACCOUNT_ID = "besepa_bank_account_id";
+
+    const META_ORDER_PAYMENT_ON_MANDATE = "besepa_payment_pending_mandate";
 
     public $id;
 
@@ -29,10 +35,13 @@ class BesepaGateway extends \WC_Payment_Gateway
 	public $subscription_support=false;
 
 
+    private $payment_error=false;
+
+
     /**
-     * @var BesepaWCRepository
+     * @var BesepaService
      */
-    private $repository;
+    private $service;
 
     function __construct()
     {
@@ -73,33 +82,20 @@ class BesepaGateway extends \WC_Payment_Gateway
      */
     public function initSubscribers()
     {
-    	\add_action('woocommerce_scheduled_subscription_payment_' . $this->id, array($this, 'onSubscriptionPayment'), 10, 2);
 
-	    \add_action('woocommerce_subscription_cancelled_' . $this->id, array($this, 'onSubscriptionCancelled'), 10, 2);
+    	add_action('woocommerce_scheduled_subscription_payment_' . $this->id, array($this, 'onSubscriptionPayment'), 10, 2);
+	    add_action('woocommerce_subscription_cancelled_' . $this->id, array($this, 'onSubscriptionCancelled'), 10, 2);
 
 	    if( is_admin() )
 	    {
-		    \add_action( 'woocommerce_update_options_payment_gateways_' . $this->id,
-			              array( $this, 'process_admin_options' ) );
-
+		    add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
 	    }
 
-        \add_action( 'user_register', array($this, 'checkoutOnUserRegistered') , 10, 1 );
+        add_action( 'woocommerce_receipt_' . $this->id, array( $this, 'receipt_page' ) );
 
     }
 
-    public function checkoutOnUserRegistered($user_id)
-    {
-        if(is_checkout())
-        {
 
-            if(isset($_POST["besepa_current_customer_id"]) && !empty($_POST["besepa_current_customer_id"]))
-            {
-                update_user_meta($user_id, UserInterface::CUSTOMERID_META, $_POST["besepa_current_customer_id"]);
-            }
-
-        }
-    }
 
     /**
      * When a scheduled payment for a subscription needs to be processed
@@ -109,28 +105,52 @@ class BesepaGateway extends \WC_Payment_Gateway
     public function onSubscriptionPayment( $amount, \WC_Order $order )
     {
 
-        $checkoutData = new CheckoutData();
-        $checkoutData->order  = $order;
-        $checkoutData->amount = $amount;
-        $checkoutData->selectedBankAccountId = get_post_meta($checkoutData->order->id, "_besepa_bank_account_id", true);
+
+        $bank_account_id = get_post_meta($order->id, static::META_BANK_ACCOUNT_ID, true);
+        $customer_id     = get_post_meta($order->id, static::META_CUSTOMER_ID, true);
+
+        $customer = $this->service->getBesepaCustomerById($customer_id);
+        $account  = $this->service->getCustomerBankAccount($bank_account_id, $customer);
 
 
-
-        if($this->repository->process($checkoutData, wcs_get_subscriptions_for_renewal_order($order)))
+        if($account)
         {
+            if($account->status == BankAccount::STATUS_ACTIVE)
+            {
+                try{
+
+                    if($debit = $this->service->createDebit($order, $account, $customer, $amount))
+                    {
+
+                        $order->add_order_note( __('BESEPA: Adeudo periódico creado correctamente', BesepaWooCommerce::LANG_DOMAIN) );
+
+                        \WC_Subscriptions_Manager::process_subscription_payments_on_order( $order );
+                        $order->update_status('completed');
+                        exit();
+                    }
 
 
 
-            \WC_Subscriptions_Manager::process_subscription_payments_on_order( $order );
-            $order->add_order_note('Pago de suscripción ok');
-            $order->update_status('completed');
-            //\WC_Subscriptions_Manager::activate_subscriptions_for_order( $order );
+
+                }  catch (\Exception $e)
+                {
+
+                }
+
+            }else{
+                $order->add_order_note( __('BESEPA: No se puede cargar el adeudo periódico, la tarjeta no está activa', BesepaWooCommerce::LANG_DOMAIN) );
+
+            }
 
 
-        }else{
-            $order->update_status( 'failed', sprintf( __( 'Besepa Transaction Failed', 'besepa' ) ) );
-            \WC_Subscriptions_Manager::process_subscription_payment_failure_on_order( $order );
         }
+        $order->update_status( 'failed', sprintf( __( 'Besepa Transaction Failed', 'besepa' ) ) );
+        \WC_Subscriptions_Manager::process_subscription_payment_failure_on_order( $order );
+        $order->add_order_note( __('BESEPA: Error creado el adeudo bancario', BesepaWooCommerce::LANG_DOMAIN) );
+
+
+        exit();
+
     }
 
     /**
@@ -149,14 +169,15 @@ class BesepaGateway extends \WC_Payment_Gateway
     	$this->subscription_support = $is_supported;
     }
 
-    /**
-     * @param BesepaWCRepository $repository
-     */
-    public function setRepository(BesepaWCRepository $repository)
-    {
-        $this->repository = $repository;
 
-        $this->repository->configure(
+    /**
+     * @param BesepaService $service
+     */
+    public function setBesepaService(BesepaService $service)
+    {
+        $this->service = $service;
+
+        $this->service->configure(
         	$this->get_option("api_key"),
 	        $this->get_option("api_account_id"),
             $this->get_option("sign_mode")
@@ -205,9 +226,9 @@ class BesepaGateway extends \WC_Payment_Gateway
                 'desc_tip' => __( 'Al añadir una cuenta bancaria, qué criterio establecer para firmar sus mandatos.', 'besepa' ),
                 'default'	  => 'force',
                 'options'     => array(
-                    BesepaWCRepository::SIGNATURE_MODE_FORCE => __('Forzar firmado', 'besepa'),
-                    BesepaWCRepository::SIGNATURE_MODE_FORM => __('Firmado por formulario', 'besepa'),
-                    BesepaWCRepository::SIGNATURE_MODE_SMS => __('Firmado por SMS', 'besepa')
+                    BesepaService::SIGNATURE_MODE_FORCE => __('Forzar firmado', 'besepa'),
+                    BesepaService::SIGNATURE_MODE_FORM => __('Firmado por formulario', 'besepa'),
+                    BesepaService::SIGNATURE_MODE_SMS => __('Firmado por SMS', 'besepa')
                 )
             ),
             'environment' => array(
@@ -227,57 +248,9 @@ class BesepaGateway extends \WC_Payment_Gateway
     public function payment_fields()
     {
 
-        $bank_accounts = array();
-        $besepaUser  = $this->repository->getUserManager()->getUser();
-        $customer_id = $besepaUser->getCustomerId();
-
-        if(!$customer_id)
-        {
-            $customer_id = WC()->session->get("customer_id", false);
-        }
-
-        if($customer_id)
-        {
-            if($_accounts = $this->repository->getBankAccounts($customer_id))
-            {
-                $bank_accounts = $_accounts;
-            }
-        }
-
-
-        include BesepaWooCommerce::getViewsDir() . 'Gateway/bank_accounts_fields.php';
+        _e("Se realizará el pago mediante un adeudo en cuenta bancaria", BesepaWooCommerce::LANG_DOMAIN);
     }
 
-    /**
-     * Validation at checkout page
-     * @return bool
-     */
-    public function validate_fields(){
-
-        if(isset($_POST["payment_method"]) &&
-           $_POST["payment_method"] == $this->id){
-
-
-            if(isset($_POST["besepa_selected_bank_account_id"]) && trim($_POST["besepa_selected_bank_account_id"])){
-
-                if(isset($_POST["besepa_current_customer_id"]) && trim($_POST["besepa_current_customer_id"])){
-
-                    return true;
-
-                }else{
-                    wc_add_notice( apply_filters( 'woocommerce_checkout_required_field_notice', __("Debes seleccionar una cuenta bancaria de Besepa", "besepa") ) , 'error' );
-                }
-
-            }else{
-                wc_add_notice( apply_filters( 'woocommerce_checkout_required_field_notice', __("Debes seleccionar una cuenta bancaria de Besepa", "besepa") ) , 'error' );
-            }
-
-
-
-        }
-        return false;
-
-    }
 
 
     /**
@@ -287,75 +260,166 @@ class BesepaGateway extends \WC_Payment_Gateway
      */
     public function process_payment($order_id)
     {
-	    $order = new \WC_Order( $order_id );
 
-	    try{
+        $order = new \WC_Order( $order_id );
 
-	        $bank_account_id = $_POST["besepa_selected_bank_account_id"];
-            $customer_id     = $_POST["besepa_current_customer_id"];
-
-	        $checkoutData = new CheckoutData();
-            $checkoutData->order                 = $order;
-            $checkoutData->selectedBankAccountId = $bank_account_id;
-            $checkoutData->selectedCustomerId    = $customer_id;
+        return array(
+            'result' 	=> 'success',
+            'redirect'	=> $order->get_checkout_payment_url( true )
+        );
 
 
+    }
 
+    function receipt_page( $order_id )
+    {
+
+        $this->processBesepaDirectPayment();
+
+
+
+        $payment_error = $this->payment_error;
+
+        $error  = false;
+        $order  = new \WC_Order( $order_id );
+        $user   = new User(get_current_user_id());
+        $besepa = $this->service;
+
+        $bank_accounts = array();
+
+
+        if(!$user->getTaxId() && !$user->getCustomerId())
+        {
+            if(!$this->processCollectTaxId($user))
+            {
+                include BesepaWooCommerce::getViewsDir() . '/taxid-page.php';
+                return;
+            }
+
+        }
+
+        if(!$user->getCustomerId())
+        {
+
+            $customer = new Customer();
+            $customer->name               = $order->billing_company;
+            $customer->taxid              = $user->getTaxId();
+            $customer->contact_name       = $order->billing_first_name . " " . $order->billing_last_name;
+            $customer->contact_email      = $order->billing_email;
+            $customer->address_postalcode = $order->billing_postcode;
+            $customer->address_street     = $order->billing_address_1 . " \n" . $order->billing_address_2;
+            $customer->address_city       = $order->billing_city;
+            $customer->address_state      = $order->billing_state;
+            $customer->address_country    = $order->billing_country;
 
             try{
-                if($this->repository->process($checkoutData)){
+                $this->service->createCustomerToUser($customer, $user);
+            }catch (CustomerCreationException $e)
+            {
+                $error = true;
+                if(WP_DEBUG)
+                    wp_die("BESEPA CUSTOMER CREATING ERROR:" . $e->getMessage());
+            }
+        }
 
-                    $order->reduce_order_stock();
-                    $order->payment_complete();
+        if(!$error)
+        {
 
-                    if( $this->subscription_support &&
-                        wcs_order_contains_subscription( $order ) )
+            $bank_accounts = $this->service->getUserBankAccounts($user);
+            $url_success   = $this->get_return_url($order);
+            $url_cancel    = $order->get_cancel_order_url(true);
+        }
+
+        include BesepaWooCommerce::getViewsDir() . '/payment-page.php';
+
+    }
+
+    private function processBesepaDirectPayment()
+    {
+
+        if(isset($_POST["besepa_action"]) && $_POST["besepa_action"]=="make_debit")
+        {
+
+            if(!isset($_POST["besepa_order_id"]) ||
+                !isset($_POST["besepa_url_cancel"]) ||
+                !isset($_POST["besepa_url_success"]) ||
+                !isset($_POST["besepa_bank_account_id"]))
+            {
+                wp_die(__("Faltan parámetros", BesepaWooCommerce::LANG_DOMAIN));
+            }
+
+            if($order = new \WC_Order($_POST["besepa_order_id"]))
+            {
+
+
+                $user     = new User(get_current_user_id());
+                $account  = $this->service->getUserBankAccount($_POST["besepa_bank_account_id"], $user);
+                $customer = $this->service->getBesepaCustomer($user);
+
+                if($account)
+                {
+                    if($account->status == BankAccount::STATUS_ACTIVE)
                     {
+                        try{
 
-                        \WC_Subscriptions_Manager::activate_subscriptions_for_order( $order );
-                        $order->update_status('completed', __( 'Pedido de suscripción completado correctamente', 'besepa' ));
+                            if($debit = $this->service->createDebit($order, $account, $customer))
+                            {
+                                add_post_meta($order->id, static::META_BANK_ACCOUNT_ID, $account->id, true);
+                                add_post_meta($order->id, static::META_CUSTOMER_ID, $customer->id, true);
+                                add_post_meta($order->id, static::META_DEBIT_ID, $debit->id, true);
+
+                                $order->add_order_note( __('BESEPA: Adeudo creado correctamente', BesepaWooCommerce::LANG_DOMAIN) );
+                                $order->payment_complete();
+                                $order->update_status('completed');
+
+                                do_action("besepa.order_processed", $order, $debit, $customer);
+
+                                wp_redirect($_POST["besepa_url_success"]);
+                                exit();
+                            }
+
+
+
+                        }  catch (\Exception $e)
+                        {
+
+                        }
+
+                    }else if($account->status == BankAccount::STATUS_PENDING_MANDATE){
+
+                        $order->add_order_note( __('BESEPA: El pedido queda en espera de firma de mandato', BesepaWooCommerce::LANG_DOMAIN) );
+                        update_post_meta($order->post->ID, static::META_ORDER_PAYMENT_ON_MANDATE, $account->id);
+
+                        wp_redirect($_POST["besepa_url_success"]);
+                        exit();
 
                     }
 
-                    \WC()->cart->empty_cart();
-
-                    return array(
-                        'result' => 'success',
-                        'redirect' => $this->get_return_url( $order )
-                    );
 
                 }
-
-            }catch (BankAccountUnsignedException $e)
-            {
-                $order = $e->checkoutData->order;
-
-                $order->update_status('pending', __( 'La cuenta bancaria no está activada, el pedido se ha completado pero queda pendiente de pago', 'besepa' ));
-                $order->reduce_order_stock();
-
-                \WC()->cart->empty_cart();
-
-                return array(
-                    'result' => 'success',
-                    'redirect' => $this->get_return_url( $order )
-                );
+                $order->add_order_note( __('BESEPA: Error creado el adeudo bancario', BesepaWooCommerce::LANG_DOMAIN) );
+                $this->payment_error = true;
 
             }
 
-
-	    }catch (PaymentProcessException $e)
-        {
-		    wc_add_notice( __('Payment error:', 'woothemes') . " ". __("error intentando realizar el cobro en la cuenta indicada", "besepa"), 'error' );
-		    return;
-
-	    }catch (\Besepa\WCPlugin\Exception\DebitCreationException $e)
-        {
-            wc_add_notice( __('Payment error:', 'woothemes') . " ". __("error intentando realizar el cobro en la cuenta indicada", "besepa"), 'error' );
-            return;
         }
 
-	    wc_add_notice( __('Payment error:', 'woothemes') . " ". __("error intentando realizar el cargo en la cuenta indicada", "besepa"), 'error' );
-	    return;
+    }
+
+    private function processCollectTaxId(User $user)
+    {
+
+        if(isset($_POST["besepa_action"]) && $_POST["besepa_action"]=="collect_taxid")
+        {
+
+            if(!empty($_POST["besepa_tax_id"])){
+                $user->setTaxId($_POST["besepa_tax_id"]);
+                return true;
+            }
+
+        }
+
+        return false;
 
     }
 
@@ -369,7 +433,7 @@ class BesepaGateway extends \WC_Payment_Gateway
     	$result = parent::process_admin_options();
 
 	    //register webhook required for besepa bankaccount activations
-	    $this->repository->registerWebhook();
+	    $this->service->registerWebhook();
 
 	    return $result;
     }
